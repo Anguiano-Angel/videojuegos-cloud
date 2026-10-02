@@ -10,3 +10,4 @@ frontend/dist/
 # Archivos de entorno y logs
 .env
 *.log
+gen-lang-client-0743912690-abe06168b1f9.json
