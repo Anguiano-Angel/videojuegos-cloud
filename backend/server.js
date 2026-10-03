@@ -9,7 +9,8 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 
-const GOOGLE_SHEETS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTAEitsnT8EYA3BjWT5dlSErNwuObdrKbuXAob0UyxBMDYAE6D3SUk9P-7YnXTmcVyquAP3guJRW2Xx/pub?output=csv";
+// Reemplaza esta URL por la URL pública CSV de tu NUEVA hoja de cálculo:
+const GOOGLE_SHEETS_CSV_URL = process.env.GOOGLE_SHEETS_CSV_URL || "https://docs.google.com/spreadsheets/d/1lZz04ck6eyYn5tyLkIPSYbNyx4GKSMZ610AmZXpvFUc/edit?usp=sharing";
 
 app.get("/", (req, res) => {
     res.json({ mensaje: "API Backend ejecutándose en la nube", estado: "Online" });
@@ -37,9 +38,10 @@ app.get("/api/productos", async (req, res) => {
             const nombre = item.Nombre || item.nombre || item.field3 || "Sin nombre";
             const precio = item.Precio || item.precio || item.field4 || "0";
             const categoria = item.Categoría || item.Categoria || item.categoria || item.field5 || "General";
+            const stock = item.Stock || item.stock || item.field6 || "0";
 
-            return { id, nombre, precio, categoria };
-        }).filter(p => p.nombre !== "Nombre");
+            return { id, nombre, precio, categoria, stock };
+        }).filter(p => p.nombre !== "Nombre" && p.nombre !== "Sin nombre");
 
         res.json(productosLimpios);
     } catch (error) {
