@@ -10,7 +10,7 @@ app.use(express.json());
 const PORT = process.env.PORT || 3000;
 
 // Reemplaza esta URL por la URL pública CSV de tu NUEVA hoja de cálculo:
-const GOOGLE_SHEETS_CSV_URL = process.env.GOOGLE_SHEETS_CSV_URL || "https://docs.google.com/spreadsheets/d/1lZz04ck6eyYn5tyLkIPSYbNyx4GKSMZ610AmZXpvFUc/edit?usp=sharing";
+const GOOGLE_SHEETS_CSV_URL = process.env.GOOGLE_SHEETS_CSV_URL || "https://docs.google.com/spreadsheets/d/e/2PACX-1vQOulzUrUEuRTG3Xj1v3WbF8BPO2Hc-Y9PwCTSO794qyRdMgcDLEs6y2hbYQkBo76eCGace9zjMvZm9/pub?gid=0&single=true&output=csv";
 
 app.get("/", (req, res) => {
     res.json({ mensaje: "API Backend ejecutándose en la nube", estado: "Online" });
