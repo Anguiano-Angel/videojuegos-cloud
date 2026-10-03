@@ -26,6 +26,16 @@ function App() {
   const [credenciales, setCredenciales] = useState({ usuario: "", password: "" });
   const [errorLogin, setErrorLogin] = useState("");
 
+  // Estado de Navegación entre Vistas: 'catalogo' (Principal) o 'administracion' (Secundaria)
+  const [vistaActual, setVistaActual] = useState("catalogo");
+
+  // Estado para la Funcionalidad Adicional: Favoritos / Wishlist
+  const [favoritos, setFavoritos] = useState([]);
+  const [mostrarSoloFavoritos, setMostrarSoloFavoritos] = useState(false);
+
+  // Estado para la Funcionalidad Adicional: Modal de Detalle Rápido (Quick View)
+  const [juegoDetalleModal, setJuegoDetalleModal] = useState(null);
+
   // Estado de Productos y API
   const [productos, setProductos] = useState([]);
   const [estadoServicio, setEstadoServicio] = useState(null);
@@ -42,13 +52,14 @@ function App() {
   const [modoEdicion, setModoEdicion] = useState(false);
   const [idEditando, setIdEditando] = useState(null);
   
-  // Modificado: plataformasSeleccionadas es un Array
+  // plataformasSeleccionadas es un Array
   const [formData, setFormData] = useState({
     titulo: "",
     plataformasSeleccionadas: ["PlayStation 5"],
     genero: "",
     precio: "",
-    stock: ""
+    stock: "",
+    imagen: ""
   });
 
   const API_URL = import.meta.env.VITE_API_URL || "https://videojuegos-backend-api.onrender.com";
@@ -89,12 +100,18 @@ function App() {
     }
   }, [autenticado]);
 
+  // Manejador de Favoritos (Toggle)
+  const toggleFavorito = (id) => {
+    setFavoritos((prev) =>
+      prev.includes(id) ? prev.filter((favId) => favId !== id) : [...prev, id]
+    );
+  };
+
   // Manejo de Selección Múltiple de Plataformas en el Formulario
   const togglePlataforma = (plat) => {
     setFormData((prev) => {
       const existe = prev.plataformasSeleccionadas.includes(plat);
       if (existe) {
-        // Evitar dejar vacío el array
         if (prev.plataformasSeleccionadas.length === 1) return prev;
         return {
           ...prev,
@@ -142,13 +159,13 @@ function App() {
 
     if (!validarFormulario()) return;
 
-    // Convertimos el array de plataformas a una cadena separada por comas para enviar al backend/Google Sheets
     const payload = {
       titulo: formData.titulo,
       plataforma: formData.plataformasSeleccionadas.join(", "),
       genero: formData.genero,
       precio: formData.precio,
-      stock: formData.stock
+      stock: formData.stock,
+      imagen: formData.imagen
     };
 
     const endpoint = modoEdicion
@@ -176,7 +193,6 @@ function App() {
     setModoEdicion(true);
     setIdEditando(p.id);
 
-    // Convertir la cadena de plataformas a array
     const platString = p.plataforma || "";
     const arrayPlats = platString
       .split(",")
@@ -188,8 +204,12 @@ function App() {
       plataformasSeleccionadas: arrayPlats.length > 0 ? arrayPlats : ["PlayStation 5"],
       genero: p.genero || p.categoria || "",
       precio: p.precio,
-      stock: p.stock
+      stock: p.stock,
+      imagen: p.imagen || p.urlImagen || ""
     });
+
+    // Si estamos editando desde la vista de catálogo, cambiamos a la vista de administración
+    setVistaActual("administracion");
   };
 
   // Eliminar
@@ -213,11 +233,12 @@ function App() {
       plataformasSeleccionadas: ["PlayStation 5"],
       genero: "",
       precio: "",
-      stock: ""
+      stock: "",
+      imagen: ""
     });
   };
 
-  // Obtener géneros dinámicos e independientes separando cadenas con comas (Ej. "FPS, Acción")
+  // Obtener géneros dinámicos e independientes
   const generosDisponibles = [
     "Todos",
     ...new Set(
@@ -230,7 +251,16 @@ function App() {
     )
   ];
 
-  // 1. Filtrado combinado (Nombre, Múltiples Géneros y Múltiples Plataformas)
+  // Generador de imagen temática por defecto en caso de no contar con URL en Google Sheets
+  const obtenerImagenJuego = (p) => {
+    if (p.imagen && p.imagen.trim().startsWith("http")) return p.imagen;
+    if (p.urlImagen && p.urlImagen.trim().startsWith("http")) return p.urlImagen;
+    
+    const termino = encodeURIComponent(p.nombre || "video game");
+    return `https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=600&q=80`;
+  };
+
+  // 1. Filtrado combinado (Nombre, Múltiples Géneros, Múltiples Plataformas y Favoritos)
   const productosFiltrados = productos.filter((p) => {
     const nombre = (p.nombre || "").toLowerCase();
     const generoRaw = (p.genero || p.categoria || "").toLowerCase();
@@ -252,13 +282,15 @@ function App() {
     if (plataformaSeleccionada === "Todas") {
       coincidePlataforma = true;
     } else if (plataformaSeleccionada === "Multiplataforma") {
-      // Lógica especial: Es Multiplataforma si tiene 2 o más plataformas asociadas
       coincidePlataforma = listaPlataformasJuego.length >= 2;
     } else {
       coincidePlataforma = listaPlataformasJuego.includes(plataformaSeleccionada.toLowerCase());
     }
 
-    return coincideNombre && coincideGenero && coincidePlataforma;
+    // Coincidencia por Favoritos
+    const coincideFavorito = !mostrarSoloFavoritos || favoritos.includes(p.id);
+
+    return coincideNombre && coincideGenero && coincidePlataforma && coincideFavorito;
   });
 
   // 2. Ordenamiento Dinámico
@@ -311,7 +343,7 @@ function App() {
     );
   }
 
-  // PANTALLA PRINCIPAL (SISTEMA CRUD)
+  // PANTALLA PRINCIPAL
   return (
     <div style={styles.container}>
       <header style={styles.header}>
@@ -320,12 +352,30 @@ function App() {
           <button style={styles.btnLogout} onClick={() => setAutenticado(false)}>Cerrar Sesión</button>
         </div>
         <h1 style={styles.title}>Catálogo de Videojuegos Cloud</h1>
+        
+        {/* MANTENEMOS ESTADO DE SERVICIO Y API (REQUISITO EXPLICITO) */}
         {estadoServicio && (
           <div style={styles.statusBadgeContainer}>
             <span style={styles.statusDot}>●</span>
             <span>API: {estadoServicio.estado} | {estadoServicio.servidor} v{estadoServicio.version}</span>
           </div>
         )}
+
+        {/* NAVEGACIÓN ACCESIBLE ENTRE VISTAS */}
+        <nav style={styles.navBar}>
+          <button
+            style={vistaActual === "catalogo" ? styles.navButtonActive : styles.navButton}
+            onClick={() => setVistaActual("catalogo")}
+          >
+            🖼️ Catálogo Visual (Principal)
+          </button>
+          <button
+            style={vistaActual === "administracion" ? styles.navButtonActive : styles.navButton}
+            onClick={() => setVistaActual("administracion")}
+          >
+            ⚙️ Administración / Lista
+          </button>
+        </nav>
       </header>
 
       {/* PANEL DE BÚSQUEDA, FILTRADO Y ORDENAMIENTO */}
@@ -349,14 +399,14 @@ function App() {
           ))}
         </select>
 
-        {/* Filtro por Plataforma (Incluye Multiplataforma y 'Todas') */}
+        {/* Filtro por Plataforma */}
         <select
           value={plataformaSeleccionada}
           onChange={(e) => setPlataformaSeleccionada(e.target.value)}
           style={styles.select}
         >
           <option value="Todas">Todas las Plataformas</option>
-          <option value="Multiplataforma">🎮 Multiplataforma (&gt;= 2)</option>
+          <option value="Multiplataforma">Multiplataforma</option>
           {LISTA_PLATAFORMAS.map((plat, i) => (
             <option key={i} value={plat}>{plat}</option>
           ))}
@@ -373,134 +423,255 @@ function App() {
           <option value="precio-asc">Sort: Precio (Menor a Mayor)</option>
           <option value="precio-desc">Sort: Precio (Mayor a Menor)</option>
         </select>
+
+        {/* Filtro Toggle para Favoritos */}
+        <button
+          type="button"
+          style={mostrarSoloFavoritos ? styles.btnFavActive : styles.btnFavInactive}
+          onClick={() => setMostrarSoloFavoritos(!mostrarSoloFavoritos)}
+        >
+          {mostrarSoloFavoritos ? "❤️ Viendo Favoritos" : "🤍 Ver Favoritos"} ({favoritos.length})
+        </button>
       </section>
 
-      {/* CONTENEDOR EN DOS COLUMNAS */}
-      <div style={styles.mainGrid}>
-        
-        {/* PANEL DE AGREGAR / EDITAR (LADO IZQUIERDO) */}
-        <section style={styles.sectionForm}>
-          <h3>{modoEdicion ? "✏️ Editar Videojuego" : "➕ Agregar Nuevo Videojuego"}</h3>
-          <form onSubmit={handleGuardar} style={styles.crudForm}>
-            <input
-              type="text"
-              placeholder="Título del juego"
-              style={styles.input}
-              value={formData.titulo}
-              onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
-            />
+      {/* BARRA DE CONTADORES */}
+      <div style={styles.counterBar}>
+        <div style={styles.counterBadge}>
+          📊 Total en Base de Datos: <strong>{productos.length}</strong>
+        </div>
+        <div style={styles.counterBadge}>
+          🔍 Resultados Visibles: <strong>{productosOrdenados.length}</strong>
+        </div>
+      </div>
 
-            {/* SELECCIÓN MÚLTIPLE DE PLATAFORMAS (CHECKBOXES / CHIPS) */}
-            <div>
-              <label style={styles.labelFormGroup}>Plataformas Disponibles:</label>
-              <div style={styles.platformSelectorContainer}>
-                {LISTA_PLATAFORMAS.map((plat) => {
-                  const seleccionada = formData.plataformasSeleccionadas.includes(plat);
-                  return (
-                    <button
-                      key={plat}
-                      type="button"
-                      onClick={() => togglePlataforma(plat)}
-                      style={seleccionada ? styles.chipSelected : styles.chipUnselected}
-                    >
-                      {seleccionada ? "✓ " : "+ "}{plat}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <input
-              type="text"
-              placeholder="Géneros (separados por coma. Ej: FPS, Shooter, Acción)"
-              style={styles.input}
-              value={formData.genero}
-              onChange={(e) => setFormData({ ...formData, genero: e.target.value })}
-            />
-            <input
-              type="number"
-              step="0.01"
-              placeholder="Precio ($)"
-              style={styles.input}
-              value={formData.precio}
-              onChange={(e) => setFormData({ ...formData, precio: e.target.value })}
-            />
-            <input
-              type="number"
-              placeholder="Stock"
-              style={styles.input}
-              value={formData.stock}
-              onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-            />
-            <div style={{ display: "flex", gap: "10px", width: "100%", marginTop: "10px" }}>
-              <button type="submit" style={styles.btnSuccess}>
-                {modoEdicion ? "Guardar Cambios" : "Agregar"}
-              </button>
-              {modoEdicion && (
-                <button type="button" style={styles.btnCancel} onClick={resetForm}>
-                  Cancelar
-                </button>
-              )}
-            </div>
-          </form>
-        </section>
-
-        {/* PANEL DE LA TABLA (LADO DERECHO) */}
-        <section style={styles.sectionTable}>
-          
-          {/* BARRA DE CONTADORES E INDICADORES */}
-          <div style={styles.counterBar}>
-            <div style={styles.counterBadge}>
-              📊 Total en Base de Datos: <strong>{productos.length}</strong>
-            </div>
-            <div style={styles.counterBadge}>
-              🔍 Resultados Visibles: <strong>{productosOrdenados.length}</strong>
-            </div>
-          </div>
-
-          {cargando ? (
-            <p style={{ textAlign: "center", padding: "20px" }}>Cargando catálogo desde Google Sheets...</p>
-          ) : (
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>ID</th>
-                  <th style={styles.th}>Título</th>
-                  <th style={styles.th}>Plataforma(s)</th>
-                  <th style={styles.th}>Género(s)</th>
-                  <th style={styles.th}>Precio</th>
-                  <th style={styles.th}>Stock</th>
-                  <th style={styles.th}>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {productosOrdenados.map((p) => {
+      {cargando ? (
+        <p style={{ textAlign: "center", padding: "40px", fontSize: "16px" }}>Cargando catálogo desde Google Sheets...</p>
+      ) : (
+        <>
+          {/* VISTA 1: CATÁLOGO VISUAL (TARJETAS / CARDS) - PRINCIPAL */}
+          {vistaActual === "catalogo" && (
+            <section style={styles.cardsGrid}>
+              {productosOrdenados.length === 0 ? (
+                <div style={styles.emptyState}>
+                  <p>No se encontraron videojuegos que coincidan con los filtros seleccionados.</p>
+                </div>
+              ) : (
+                productosOrdenados.map((p) => {
+                  const esFav = favoritos.includes(p.id);
                   const platString = p.plataforma || "N/A";
                   const esMulti = platString.split(",").length >= 2;
-                  return (
-                    <tr key={p.id}>
-                      <td style={styles.td}>#{p.id}</td>
-                      <td style={styles.td}><strong>{p.nombre}</strong></td>
-                      <td style={styles.td}>
-                        {platString}
-                        {esMulti && <span style={styles.multiBadge}>Multi</span>}
-                      </td>
-                      <td style={styles.td}>{p.genero || p.categoria || "N/A"}</td>
-                      <td style={styles.td}>${p.precio}</td>
-                      <td style={styles.td}>{p.stock} uds.</td>
-                      <td style={styles.td}>
-                        <button style={styles.btnEdit} onClick={() => handleEditar(p)}>Editar</button>
-                        <button style={styles.btnDelete} onClick={() => handleEliminar(p.id)}>Eliminar</button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </section>
+                  const imgUrl = obtenerImagenJuego(p);
 
-      </div>
+                  return (
+                    <div key={p.id} style={styles.card}>
+                      <div style={styles.cardImageContainer}>
+                        <img src={imgUrl} alt={p.nombre} style={styles.cardImage} />
+                        <button
+                          style={styles.cardFavButton}
+                          onClick={() => toggleFavorito(p.id)}
+                          title={esFav ? "Quitar de Favoritos" : "Agregar a Favoritos"}
+                        >
+                          {esFav ? "❤️" : "🤍"}
+                        </button>
+                        {esMulti && <span style={styles.cardMultiBadge}>Multiplataforma</span>}
+                      </div>
+
+                      <div style={styles.cardBody}>
+                        <h3 style={styles.cardTitle}>{p.nombre}</h3>
+                        <p style={styles.cardGenre}>🏷️ {p.genero || p.categoria || "General"}</p>
+                        <p style={styles.cardPlatform}>🎮 {platString}</p>
+
+                        <div style={styles.cardFooter}>
+                          <div>
+                            <span style={styles.cardPrice}>${p.precio}</span>
+                            <span style={styles.cardStock}>{p.stock} dispon.</span>
+                          </div>
+                          <button
+                            style={styles.btnQuickView}
+                            onClick={() => setJuegoDetalleModal(p)}
+                          >
+                            👁️ Detalle
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </section>
+          )}
+
+          {/* VISTA 2: ADMINISTRACIÓN / LISTA Y FORMULARIO (SECTORES ORIGINALES) */}
+          {vistaActual === "administracion" && (
+            <div style={styles.mainGrid}>
+              
+              {/* PANEL DE AGREGAR / EDITAR (LADO IZQUIERDO) */}
+              <section style={styles.sectionForm}>
+                <h3>{modoEdicion ? "✏️️ Editar Videojuego" : "➕ Agregar Nuevo Videojuego"}</h3>
+                <form onSubmit={handleGuardar} style={styles.crudForm}>
+                  <input
+                    type="text"
+                    placeholder="Título del juego"
+                    style={styles.input}
+                    value={formData.titulo}
+                    onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
+                  />
+
+                  {/* SELECCIÓN MÚLTIPLE DE PLATAFORMAS */}
+                  <div>
+                    <label style={styles.labelFormGroup}>Plataformas Disponibles:</label>
+                    <div style={styles.platformSelectorContainer}>
+                      {LISTA_PLATAFORMAS.map((plat) => {
+                        const seleccionada = formData.plataformasSeleccionadas.includes(plat);
+                        return (
+                          <button
+                            key={plat}
+                            type="button"
+                            onClick={() => togglePlataforma(plat)}
+                            style={seleccionada ? styles.chipSelected : styles.chipUnselected}
+                          >
+                            {seleccionada ? "✓ " : "+ "}{plat}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <input
+                    type="text"
+                    placeholder="Géneros (separados por coma. Ej: FPS, Shooter)"
+                    style={styles.input}
+                    value={formData.genero}
+                    onChange={(e) => setFormData({ ...formData, genero: e.target.value })}
+                  />
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="Precio ($)"
+                    style={styles.input}
+                    value={formData.precio}
+                    onChange={(e) => setFormData({ ...formData, precio: e.target.value })}
+                  />
+                  <input
+                    type="number"
+                    placeholder="Stock"
+                    style={styles.input}
+                    value={formData.stock}
+                    onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                  />
+                  <input
+                    type="text"
+                    placeholder="URL Imagen de Portada (Opcional)"
+                    style={styles.input}
+                    value={formData.imagen}
+                    onChange={(e) => setFormData({ ...formData, imagen: e.target.value })}
+                  />
+                  
+                  <div style={{ display: "flex", gap: "10px", width: "100%", marginTop: "10px" }}>
+                    <button type="submit" style={styles.btnSuccess}>
+                      {modoEdicion ? "Guardar Cambios" : "Agregar"}
+                    </button>
+                    {modoEdicion && (
+                      <button type="button" style={styles.btnCancel} onClick={resetForm}>
+                        Cancelar
+                      </button>
+                    )}
+                  </div>
+                </form>
+              </section>
+
+              {/* PANEL DE LA TABLA (LADO DERECHO) */}
+              <section style={styles.sectionTable}>
+                <table style={styles.table}>
+                  <thead>
+                    <tr>
+                      <th style={styles.th}>ID</th>
+                      <th style={styles.th}>Título</th>
+                      <th style={styles.th}>Plataforma(s)</th>
+                      <th style={styles.th}>Género(s)</th>
+                      <th style={styles.th}>Precio</th>
+                      <th style={styles.th}>Stock</th>
+                      <th style={styles.th}>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {productosOrdenados.map((p) => {
+                      const platString = p.plataforma || "N/A";
+                      const esMulti = platString.split(",").length >= 2;
+                      return (
+                        <tr key={p.id}>
+                          <td style={styles.td}>#{p.id}</td>
+                          <td style={styles.td}><strong>{p.nombre}</strong></td>
+                          <td style={styles.td}>
+                            {platString}
+                            {esMulti && <span style={styles.multiBadge}>Multi</span>}
+                          </td>
+                          <td style={styles.td}>{p.genero || p.categoria || "N/A"}</td>
+                          <td style={styles.td}>${p.precio}</td>
+                          <td style={styles.td}>{p.stock} uds.</td>
+                          <td style={styles.td}>
+                            <button style={styles.btnEdit} onClick={() => handleEditar(p)}>Editar</button>
+                            <button style={styles.btnDelete} onClick={() => handleEliminar(p.id)}>Eliminar</button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </section>
+
+            </div>
+          )}
+        </>
+      )}
+
+      {/* MODAL DE DETALLE RÁPIDO (QUICK VIEW) */}
+      {juegoDetalleModal && (
+        <div style={styles.modalOverlay} onClick={() => setJuegoDetalleModal(null)}>
+          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <button style={styles.modalCloseButton} onClick={() => setJuegoDetalleModal(null)}>
+              ✖
+            </button>
+            <div style={styles.modalGrid}>
+              <img
+                src={obtenerImagenJuego(juegoDetalleModal)}
+                alt={juegoDetalleModal.nombre}
+                style={styles.modalImage}
+              />
+              <div style={styles.modalInfo}>
+                <h2 style={styles.modalTitle}>{juegoDetalleModal.nombre}</h2>
+                <div style={styles.modalBadgeRow}>
+                  <span style={styles.modalBadge}>ID: #{juegoDetalleModal.id}</span>
+                  <span style={styles.modalBadgePrice}>${juegoDetalleModal.precio}</span>
+                </div>
+                <p><strong>🎮 Plataformas:</strong> {juegoDetalleModal.plataforma || "N/A"}</p>
+                <p><strong>🏷️ Género(s):</strong> {juegoDetalleModal.genero || juegoDetalleModal.categoria || "General"}</p>
+                <p><strong>📦 Stock Disponible:</strong> {juegoDetalleModal.stock} unidades</p>
+                
+                <div style={{ marginTop: "20px", display: "flex", gap: "10px" }}>
+                  <button
+                    style={styles.btnSuccess}
+                    onClick={() => {
+                      const id = juegoDetalleModal.id;
+                      setJuegoDetalleModal(null);
+                      handleEditar(productos.find((p) => p.id === id));
+                    }}
+                  >
+                    ✏️ Editar este Juego
+                  </button>
+                  <button
+                    style={styles.btnCancel}
+                    onClick={() => setJuegoDetalleModal(null)}
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
@@ -525,11 +696,18 @@ const styles = {
   header: { marginBottom: "20px" },
   badgeCloud: { color: "#38bdf8", fontSize: "14px" },
   title: { fontSize: "2rem", margin: "10px 0" },
-  statusBadgeContainer: { fontSize: "12px", color: "#94a3b8" },
+  statusBadgeContainer: { fontSize: "12px", color: "#94a3b8", marginBottom: "15px" },
   statusDot: { color: "#22c55e", marginRight: "5px" },
-  
-  filterSection: { display: "flex", gap: "12px", marginBottom: "20px", backgroundColor: "#1e293b", padding: "15px", borderRadius: "10px", flexWrap: "wrap" },
-  
+
+  // Estilos de Navegación
+  navBar: { display: "flex", gap: "10px", marginTop: "15px" },
+  navButton: { padding: "10px 18px", backgroundColor: "#1e293b", color: "#94a3b8", border: "1px solid #334155", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" },
+  navButtonActive: { padding: "10px 18px", backgroundColor: "#0284c7", color: "#ffffff", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" },
+
+  filterSection: { display: "flex", gap: "12px", marginBottom: "20px", backgroundColor: "#1e293b", padding: "15px", borderRadius: "10px", flexWrap: "wrap", alignItems: "center" },
+  btnFavActive: { padding: "10px 14px", backgroundColor: "#e11d48", color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer", fontWeight: "bold" },
+  btnFavInactive: { padding: "10px 14px", backgroundColor: "#334155", color: "#cbd5e1", border: "none", borderRadius: "6px", cursor: "pointer" },
+
   mainGrid: { display: "grid", gridTemplateColumns: "340px 1fr", gap: "20px", alignItems: "start" },
   
   sectionForm: { backgroundColor: "#1e293b", padding: "20px", borderRadius: "10px" },
@@ -540,7 +718,7 @@ const styles = {
   chipSelected: { backgroundColor: "#0284c7", color: "#ffffff", border: "none", padding: "4px 8px", borderRadius: "12px", fontSize: "11px", cursor: "pointer", fontWeight: "bold" },
   chipUnselected: { backgroundColor: "#334155", color: "#94a3b8", border: "none", padding: "4px 8px", borderRadius: "12px", fontSize: "11px", cursor: "pointer" },
 
-  counterBar: { display: "flex", gap: "15px", padding: "12px 16px", backgroundColor: "#0f172a", borderBottom: "1px solid #334155" },
+  counterBar: { display: "flex", gap: "15px", padding: "12px 16px", backgroundColor: "#0f172a", borderRadius: "8px", marginBottom: "20px" },
   counterBadge: { fontSize: "13px", color: "#cbd5e1" },
 
   table: { width: "100%", borderCollapse: "collapse", backgroundColor: "#1e293b" },
@@ -548,8 +726,36 @@ const styles = {
   td: { padding: "12px", borderBottom: "1px solid #334155", fontSize: "14px" },
   btnEdit: { backgroundColor: "#eab308", border: "none", padding: "6px 12px", borderRadius: "4px", color: "#000", fontWeight: "bold", cursor: "pointer", marginRight: "5px" },
   btnDelete: { backgroundColor: "#ef4444", border: "none", padding: "6px 12px", borderRadius: "4px", color: "#fff", fontWeight: "bold", cursor: "pointer" },
-  
-  multiBadge: { marginLeft: "8px", backgroundColor: "#38bdf8", color: "#0f172a", padding: "2px 6px", borderRadius: "4px", fontSize: "10px", fontWeight: "bold" }
+  multiBadge: { marginLeft: "8px", backgroundColor: "#38bdf8", color: "#0f172a", padding: "2px 6px", borderRadius: "4px", fontSize: "10px", fontWeight: "bold" },
+
+  // Estilos de Tarjetas (Cards Grid)
+  cardsGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))", gap: "20px" },
+  emptyState: { gridColumn: "1 / -1", padding: "40px", backgroundColor: "#1e293b", borderRadius: "12px", textAlign: "center", color: "#94a3b8" },
+  card: { backgroundColor: "#1e293b", borderRadius: "12px", overflow: "hidden", border: "1px solid #334155", display: "flex", flexDirection: "column", transition: "transform 0.2s" },
+  cardImageContainer: { height: "180px", width: "100%", position: "relative", backgroundColor: "#0f172a", overflow: "hidden" },
+  cardImage: { width: "100%", height: "100%", objectFit: "cover" },
+  cardFavButton: { position: "absolute", top: "10px", right: "10px", backgroundColor: "rgba(15, 23, 42, 0.7)", border: "none", borderRadius: "50%", width: "36px", height: "36px", cursor: "pointer", fontSize: "16px", display: "flex", alignItems: "center", justifyContent: "center" },
+  cardMultiBadge: { position: "absolute", bottom: "10px", left: "10px", backgroundColor: "#38bdf8", color: "#0f172a", fontSize: "10px", fontWeight: "bold", padding: "3px 8px", borderRadius: "4px" },
+  cardBody: { padding: "15px", display: "flex", flexDirection: "column", flex: 1 },
+  cardTitle: { fontSize: "1.1rem", margin: "0 0 8px 0", color: "#f8fafc" },
+  cardGenre: { fontSize: "12px", color: "#38bdf8", margin: "0 0 4px 0" },
+  cardPlatform: { fontSize: "12px", color: "#cbd5e1", margin: "0 0 12px 0" },
+  cardFooter: { marginTop: "auto", display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "10px", borderTop: "1px solid #334155" },
+  cardPrice: { fontSize: "1.2rem", fontWeight: "bold", color: "#22c55e", display: "block" },
+  cardStock: { fontSize: "11px", color: "#94a3b8", display: "block" },
+  btnQuickView: { backgroundColor: "#0284c7", color: "#fff", border: "none", padding: "6px 12px", borderRadius: "6px", fontSize: "12px", cursor: "pointer", fontWeight: "bold" },
+
+  // Estilos del Modal
+  modalOverlay: { position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0, 0, 0, 0.8)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1000, padding: "20px" },
+  modalContent: { backgroundColor: "#1e293b", borderRadius: "12px", width: "100%", maxWidth: "650px", position: "relative", padding: "25px", border: "1px solid #475569" },
+  modalCloseButton: { position: "absolute", top: "15px", right: "15px", backgroundColor: "transparent", border: "none", color: "#cbd5e1", fontSize: "18px", cursor: "pointer" },
+  modalGrid: { display: "grid", gridTemplateColumns: "220px 1fr", gap: "20px" },
+  modalImage: { width: "100%", height: "280px", objectFit: "cover", borderRadius: "8px" },
+  modalInfo: { color: "#f8fafc", fontSize: "14px", display: "flex", flexDirection: "column", gap: "8px" },
+  modalTitle: { fontSize: "1.5rem", margin: 0, color: "#38bdf8" },
+  modalBadgeRow: { display: "flex", gap: "10px", alignItems: "center", marginBottom: "10px" },
+  modalBadge: { backgroundColor: "#334155", color: "#cbd5e1", padding: "4px 8px", borderRadius: "4px", fontSize: "12px" },
+  modalBadgePrice: { backgroundColor: "#22c55e", color: "#0f172a", fontWeight: "bold", padding: "4px 8px", borderRadius: "4px", fontSize: "14px" }
 };
 
 export default App;
