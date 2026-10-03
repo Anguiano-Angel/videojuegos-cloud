@@ -3,15 +3,16 @@ import "./App.css";
 
 // Opciones predefinidas para el ComboBox de Plataformas
 const OPCIONES_PLATAFORMAS = [
+  "Multiplataforma",
   "PlayStation 1",
   "PlayStation 2",
   "PlayStation 3",
   "PlayStation 4",
   "PlayStation 5",
-  "Xbox Clásico",
-  "Xbox 360",
-  "Xbox One",
-  "Xbox Series X/S",
+  "XBOX Clásico",
+  "XBOX 360",
+  "XBOX One",
+  "XBOX Series X/S",
   "PC (Steam)",
   "Nintendo GameCube",
   "Nintendo Wii",
@@ -32,10 +33,11 @@ function App() {
   const [cargando, setCargando] = useState(true);
   const [errorAPI, setErrorAPI] = useState(false);
 
-  // Estados de Filtros Separados
+  // Estados de Filtros Separados y Ordenamiento (Opción C)
   const [busqueda, setBusqueda] = useState("");
   const [generoSeleccionado, setGeneroSeleccionado] = useState("Todos");
   const [plataformaSeleccionada, setPlataformaSeleccionada] = useState("Todas");
+  const [ordenamiento, setOrdenamiento] = useState("nombre-asc");
 
   // Estados del Formulario (Crear / Editar)
   const [modoEdicion, setModoEdicion] = useState(false);
@@ -86,13 +88,35 @@ function App() {
     }
   }, [autenticado]);
 
+  // VALIDACIÓN DE FORMULARIO (Opción D)
+  const validarFormulario = () => {
+    if (!formData.titulo.trim()) {
+      alert("⚠️ El título del juego es obligatorio.");
+      return false;
+    }
+    if (!formData.genero.trim()) {
+      alert("⚠️ El género es obligatorio.");
+      return false;
+    }
+    const precioNum = parseFloat(formData.precio);
+    if (isNaN(precioNum) || precioNum <= 0) {
+      alert("⚠️ Por favor ingresa un precio válido mayor a 0.");
+      return false;
+    }
+    const stockNum = parseInt(formData.stock, 10);
+    if (isNaN(stockNum) || stockNum < 0) {
+      alert("⚠️ El stock debe ser un número entero igual o mayor a 0.");
+      return false;
+    }
+    return true;
+  };
+
   // Guardar (Crear o Editar)
   const handleGuardar = (e) => {
     e.preventDefault();
-    if (!formData.titulo || !formData.precio) {
-      alert("Por favor completa al menos el título y el precio.");
-      return;
-    }
+
+    // Ejecutamos validación previa (Opción D)
+    if (!validarFormulario()) return;
 
     const endpoint = modoEdicion
       ? `${API_URL}/api/productos/${idEditando}`
@@ -156,7 +180,7 @@ function App() {
     )
   ];
 
-  // Filtrado combinado (Nombre, Género y Plataforma)
+  // 1. Filtrado combinado (Nombre, Género y Plataforma)
   const productosFiltrados = productos.filter((p) => {
     const nombre = (p.nombre || "").toLowerCase();
     const genero = (p.genero || p.categoria || "").toLowerCase();
@@ -169,6 +193,20 @@ function App() {
       plataformaSeleccionada === "Todas" || plataforma === plataformaSeleccionada.toLowerCase();
 
     return coincideNombre && coincideGenero && coincidePlataforma;
+  });
+
+  // 2. Aplicar ORDENAMIENTO DINÁMICO (Opción C)
+  const productosOrdenados = [...productosFiltrados].sort((a, b) => {
+    const nombreA = (a.nombre || "").toLowerCase();
+    const nombreB = (b.nombre || "").toLowerCase();
+    const precioA = parseFloat(a.precio) || 0;
+    const precioB = parseFloat(b.precio) || 0;
+
+    if (ordenamiento === "nombre-asc") return nombreA.localeCompare(nombreB);
+    if (ordenamiento === "nombre-desc") return nombreB.localeCompare(nombreA);
+    if (ordenamiento === "precio-asc") return precioA - precioB;
+    if (ordenamiento === "precio-desc") return precioB - precioA;
+    return 0;
   });
 
   // PANTALLA DE LOGIN
@@ -224,7 +262,7 @@ function App() {
         )}
       </header>
 
-      {/* 2. PANEL DE BÚSQUEDA Y FILTRADO (ARRIBA DE LOS PANELES) */}
+      {/* PANEL DE BÚSQUEDA, FILTRADO Y ORDENAMIENTO (Opción C) */}
       <section style={styles.filterSection}>
         <input
           type="text"
@@ -234,7 +272,7 @@ function App() {
           style={{ ...styles.input, flex: 2 }}
         />
         
-        {/* 4. FILTRO ÚNICAMENTE PARA GÉNEROS */}
+        {/* Filtro por Género */}
         <select
           value={generoSeleccionado}
           onChange={(e) => setGeneroSeleccionado(e.target.value)}
@@ -245,7 +283,7 @@ function App() {
           ))}
         </select>
 
-        {/* 4. FILTRO ÚNICAMENTE PARA PLATAFORMAS */}
+        {/* Filtro por Plataforma */}
         <select
           value={plataformaSeleccionada}
           onChange={(e) => setPlataformaSeleccionada(e.target.value)}
@@ -256,12 +294,24 @@ function App() {
             <option key={i} value={plat}>{plat}</option>
           ))}
         </select>
+
+        {/* Selector de Ordenamiento (Opción C) */}
+        <select
+          value={ordenamiento}
+          onChange={(e) => setOrdenamiento(e.target.value)}
+          style={styles.select}
+        >
+          <option value="nombre-asc">Sort: Nombre (A-Z)</option>
+          <option value="nombre-desc">Sort: Nombre (Z-A)</option>
+          <option value="precio-asc">Sort: Precio (Menor a Mayor)</option>
+          <option value="precio-desc">Sort: Precio (Mayor a Menor)</option>
+        </select>
       </section>
 
       {/* CONTENEDOR EN DOS COLUMNAS */}
       <div style={styles.mainGrid}>
         
-        {/* 1. PANEL DE AGREGAR / EDITAR (LADO IZQUIERDO) */}
+        {/* PANEL DE AGREGAR / EDITAR (LADO IZQUIERDO) */}
         <section style={styles.sectionForm}>
           <h3>{modoEdicion ? "✏️ Editar Videojuego" : "➕ Agregar Nuevo Videojuego"}</h3>
           <form onSubmit={handleGuardar} style={styles.crudForm}>
@@ -273,7 +323,6 @@ function App() {
               onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
             />
             
-            {/* 3. COMBOBOX PARA SELECCIONAR PLATAFORMA */}
             <select
               style={styles.selectForm}
               value={formData.plataforma}
@@ -293,6 +342,7 @@ function App() {
             />
             <input
               type="number"
+              step="0.01"
               placeholder="Precio ($)"
               style={styles.input}
               value={formData.precio}
@@ -318,8 +368,19 @@ function App() {
           </form>
         </section>
 
-        {/* PANEL DE LA TABLA (LADO DERECHO AL MISMO NIVEL) */}
+        {/* PANEL DE LA TABLA (LADO DERECHO) */}
         <section style={styles.sectionTable}>
+          
+          {/* BARRA DE CONTADORES E INDICADORES (Opción E) */}
+          <div style={styles.counterBar}>
+            <div style={styles.counterBadge}>
+              📊 Total en Base de Datos: <strong>{productos.length}</strong>
+            </div>
+            <div style={styles.counterBadge}>
+              🔍 Resultados Visibles: <strong>{productosOrdenados.length}</strong>
+            </div>
+          </div>
+
           {cargando ? (
             <p style={{ textAlign: "center", padding: "20px" }}>Cargando catálogo desde Google Sheets...</p>
           ) : (
@@ -336,7 +397,7 @@ function App() {
                 </tr>
               </thead>
               <tbody>
-                {productosFiltrados.map((p) => (
+                {productosOrdenados.map((p) => (
                   <tr key={p.id}>
                     <td style={styles.td}>#{p.id}</td>
                     <td style={styles.td}><strong>{p.nombre}</strong></td>
@@ -370,7 +431,7 @@ const styles = {
   inputGroup: { marginBottom: "15px", textAlign: "left" },
   label: { display: "block", color: "#cbd5e1", fontSize: "13px", marginBottom: "5px" },
   input: { width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #475569", backgroundColor: "#0f172a", color: "#fff", boxSizing: "border-box" },
-  select: { padding: "10px", borderRadius: "6px", border: "1px solid #475569", backgroundColor: "#0f172a", color: "#fff", flex: 1, minWidth: "150px" },
+  select: { padding: "10px", borderRadius: "6px", border: "1px solid #475569", backgroundColor: "#0f172a", color: "#fff", flex: 1, minWidth: "140px" },
   selectForm: { width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #475569", backgroundColor: "#0f172a", color: "#fff", boxSizing: "border-box" },
   btnPrimary: { width: "100%", padding: "10px", backgroundColor: "#38bdf8", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: "pointer", marginTop: "10px" },
   btnSuccess: { width: "100%", padding: "10px 20px", backgroundColor: "#22c55e", border: "none", borderRadius: "6px", color: "#fff", fontWeight: "bold", cursor: "pointer" },
@@ -384,7 +445,7 @@ const styles = {
   statusDot: { color: "#22c55e", marginRight: "5px" },
   
   /* Filtros Arriba */
-  filterSection: { display: "flex", gap: "12px", marginBottom: "20px", backgroundColor: "#1e293b", padding: "15px", borderRadius: "10px" },
+  filterSection: { display: "flex", gap: "12px", marginBottom: "20px", backgroundColor: "#1e293b", padding: "15px", borderRadius: "10px", flexWrap: "wrap" },
   
   /* Layout de Grid (Izquierda / Derecha) */
   mainGrid: { display: "grid", gridTemplateColumns: "320px 1fr", gap: "20px", alignItems: "start" },
@@ -394,6 +455,10 @@ const styles = {
   sectionTable: { backgroundColor: "#1e293b", borderRadius: "10px", overflow: "hidden" },
   crudForm: { display: "flex", flexDirection: "column", gap: "12px" },
   
+  /* Barra de Contadores (Opción E) */
+  counterBar: { display: "flex", gap: "15px", padding: "12px 16px", backgroundColor: "#0f172a", borderBottom: "1px solid #334155" },
+  counterBadge: { fontSize: "13px", color: "#cbd5e1" },
+
   /* Tabla */
   table: { width: "100%", borderCollapse: "collapse", backgroundColor: "#1e293b" },
   th: { padding: "12px", backgroundColor: "#334155", textAlign: "left", fontSize: "14px" },
