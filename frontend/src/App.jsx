@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 
-// Opciones predefinidas para el ComboBox de Plataformas
-const OPCIONES_PLATAFORMAS = [
-  "Multiplataforma",
+// Opciones predefinidas de Plataformas (Sin 'Multiplataforma' para el selector de creación)
+const LISTA_PLATAFORMAS = [
   "PlayStation 1",
   "PlayStation 2",
   "PlayStation 3",
@@ -33,7 +32,7 @@ function App() {
   const [cargando, setCargando] = useState(true);
   const [errorAPI, setErrorAPI] = useState(false);
 
-  // Estados de Filtros Separados y Ordenamiento (Opción C)
+  // Estados de Filtros Separados y Ordenamiento
   const [busqueda, setBusqueda] = useState("");
   const [generoSeleccionado, setGeneroSeleccionado] = useState("Todos");
   const [plataformaSeleccionada, setPlataformaSeleccionada] = useState("Todas");
@@ -42,9 +41,11 @@ function App() {
   // Estados del Formulario (Crear / Editar)
   const [modoEdicion, setModoEdicion] = useState(false);
   const [idEditando, setIdEditando] = useState(null);
+  
+  // Modificado: plataformasSeleccionadas es un Array
   const [formData, setFormData] = useState({
     titulo: "",
-    plataforma: "PlayStation 5",
+    plataformasSeleccionadas: ["PlayStation 5"],
     genero: "",
     precio: "",
     stock: ""
@@ -88,14 +89,38 @@ function App() {
     }
   }, [autenticado]);
 
-  // VALIDACIÓN DE FORMULARIO (Opción D)
+  // Manejo de Selección Múltiple de Plataformas en el Formulario
+  const togglePlataforma = (plat) => {
+    setFormData((prev) => {
+      const existe = prev.plataformasSeleccionadas.includes(plat);
+      if (existe) {
+        // Evitar dejar vacío el array
+        if (prev.plataformasSeleccionadas.length === 1) return prev;
+        return {
+          ...prev,
+          plataformasSeleccionadas: prev.plataformasSeleccionadas.filter((p) => p !== plat)
+        };
+      } else {
+        return {
+          ...prev,
+          plataformasSeleccionadas: [...prev.plataformasSeleccionadas, plat]
+        };
+      }
+    });
+  };
+
+  // VALIDACIÓN DE FORMULARIO
   const validarFormulario = () => {
     if (!formData.titulo.trim()) {
       alert("⚠️ El título del juego es obligatorio.");
       return false;
     }
+    if (formData.plataformasSeleccionadas.length === 0) {
+      alert("⚠️ Debes seleccionar al menos una plataforma.");
+      return false;
+    }
     if (!formData.genero.trim()) {
-      alert("⚠️ El género es obligatorio.");
+      alert("⚠️ Ingresa al menos un género.");
       return false;
     }
     const precioNum = parseFloat(formData.precio);
@@ -115,8 +140,16 @@ function App() {
   const handleGuardar = (e) => {
     e.preventDefault();
 
-    // Ejecutamos validación previa (Opción D)
     if (!validarFormulario()) return;
+
+    // Convertimos el array de plataformas a una cadena separada por comas para enviar al backend/Google Sheets
+    const payload = {
+      titulo: formData.titulo,
+      plataforma: formData.plataformasSeleccionadas.join(", "),
+      genero: formData.genero,
+      precio: formData.precio,
+      stock: formData.stock
+    };
 
     const endpoint = modoEdicion
       ? `${API_URL}/api/productos/${idEditando}`
@@ -127,7 +160,7 @@ function App() {
     fetch(endpoint, {
       method: metodo,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(formData)
+      body: JSON.stringify(payload)
     })
       .then((res) => res.json())
       .then(() => {
@@ -142,9 +175,17 @@ function App() {
   const handleEditar = (p) => {
     setModoEdicion(true);
     setIdEditando(p.id);
+
+    // Convertir la cadena de plataformas a array
+    const platString = p.plataforma || "";
+    const arrayPlats = platString
+      .split(",")
+      .map((item) => item.trim())
+      .filter((item) => LISTA_PLATAFORMAS.includes(item));
+
     setFormData({
       titulo: p.nombre,
-      plataforma: p.plataforma || OPCIONES_PLATAFORMAS[0],
+      plataformasSeleccionadas: arrayPlats.length > 0 ? arrayPlats : ["PlayStation 5"],
       genero: p.genero || p.categoria || "",
       precio: p.precio,
       stock: p.stock
@@ -167,35 +208,60 @@ function App() {
   const resetForm = () => {
     setModoEdicion(false);
     setIdEditando(null);
-    setFormData({ titulo: "", plataforma: "PlayStation 5", genero: "", precio: "", stock: "" });
+    setFormData({
+      titulo: "",
+      plataformasSeleccionadas: ["PlayStation 5"],
+      genero: "",
+      precio: "",
+      stock: ""
+    });
   };
 
-  // Obtener géneros dinámicos de los productos existentes
+  // Obtener géneros dinámicos e independientes separando cadenas con comas (Ej. "FPS, Acción")
   const generosDisponibles = [
     "Todos",
     ...new Set(
       productos
-        .map((p) => p.genero || p.categoria)
+        .flatMap((p) => {
+          const raw = p.genero || p.categoria || "";
+          return raw.split(",").map((g) => g.trim());
+        })
         .filter(Boolean)
     )
   ];
 
-  // 1. Filtrado combinado (Nombre, Género y Plataforma)
+  // 1. Filtrado combinado (Nombre, Múltiples Géneros y Múltiples Plataformas)
   const productosFiltrados = productos.filter((p) => {
     const nombre = (p.nombre || "").toLowerCase();
-    const genero = (p.genero || p.categoria || "").toLowerCase();
-    const plataforma = (p.plataforma || "").toLowerCase();
+    const generoRaw = (p.genero || p.categoria || "").toLowerCase();
+    const listaGenerosJuego = generoRaw.split(",").map((g) => g.trim());
 
+    const plataformaRaw = (p.plataforma || "").toLowerCase();
+    const listaPlataformasJuego = plataformaRaw.split(",").map((plat) => plat.trim());
+
+    // Búsqueda por Nombre
     const coincideNombre = nombre.includes(busqueda.toLowerCase());
+
+    // Coincidencia por Género
     const coincideGenero =
-      generoSeleccionado === "Todos" || genero === generoSeleccionado.toLowerCase();
-    const coincidePlataforma =
-      plataformaSeleccionada === "Todas" || plataforma === plataformaSeleccionada.toLowerCase();
+      generoSeleccionado === "Todos" ||
+      listaGenerosJuego.includes(generoSeleccionado.toLowerCase());
+
+    // Coincidencia por Plataforma
+    let coincidePlataforma = false;
+    if (plataformaSeleccionada === "Todas") {
+      coincidePlataforma = true;
+    } else if (plataformaSeleccionada === "Multiplataforma") {
+      // Lógica especial: Es Multiplataforma si tiene 2 o más plataformas asociadas
+      coincidePlataforma = listaPlataformasJuego.length >= 2;
+    } else {
+      coincidePlataforma = listaPlataformasJuego.includes(plataformaSeleccionada.toLowerCase());
+    }
 
     return coincideNombre && coincideGenero && coincidePlataforma;
   });
 
-  // 2. Aplicar ORDENAMIENTO DINÁMICO (Opción C)
+  // 2. Ordenamiento Dinámico
   const productosOrdenados = [...productosFiltrados].sort((a, b) => {
     const nombreA = (a.nombre || "").toLowerCase();
     const nombreB = (b.nombre || "").toLowerCase();
@@ -262,7 +328,7 @@ function App() {
         )}
       </header>
 
-      {/* PANEL DE BÚSQUEDA, FILTRADO Y ORDENAMIENTO (Opción C) */}
+      {/* PANEL DE BÚSQUEDA, FILTRADO Y ORDENAMIENTO */}
       <section style={styles.filterSection}>
         <input
           type="text"
@@ -283,19 +349,20 @@ function App() {
           ))}
         </select>
 
-        {/* Filtro por Plataforma */}
+        {/* Filtro por Plataforma (Incluye Multiplataforma y 'Todas') */}
         <select
           value={plataformaSeleccionada}
           onChange={(e) => setPlataformaSeleccionada(e.target.value)}
           style={styles.select}
         >
           <option value="Todas">Todas las Plataformas</option>
-          {OPCIONES_PLATAFORMAS.map((plat, i) => (
+          <option value="Multiplataforma">🎮 Multiplataforma (&gt;= 2)</option>
+          {LISTA_PLATAFORMAS.map((plat, i) => (
             <option key={i} value={plat}>{plat}</option>
           ))}
         </select>
 
-        {/* Selector de Ordenamiento (Opción C) */}
+        {/* Selector de Ordenamiento */}
         <select
           value={ordenamiento}
           onChange={(e) => setOrdenamiento(e.target.value)}
@@ -322,20 +389,30 @@ function App() {
               value={formData.titulo}
               onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
             />
-            
-            <select
-              style={styles.selectForm}
-              value={formData.plataforma}
-              onChange={(e) => setFormData({ ...formData, plataforma: e.target.value })}
-            >
-              {OPCIONES_PLATAFORMAS.map((plat, i) => (
-                <option key={i} value={plat}>{plat}</option>
-              ))}
-            </select>
+
+            {/* SELECCIÓN MÚLTIPLE DE PLATAFORMAS (CHECKBOXES / CHIPS) */}
+            <div>
+              <label style={styles.labelFormGroup}>Plataformas Disponibles:</label>
+              <div style={styles.platformSelectorContainer}>
+                {LISTA_PLATAFORMAS.map((plat) => {
+                  const seleccionada = formData.plataformasSeleccionadas.includes(plat);
+                  return (
+                    <button
+                      key={plat}
+                      type="button"
+                      onClick={() => togglePlataforma(plat)}
+                      style={seleccionada ? styles.chipSelected : styles.chipUnselected}
+                    >
+                      {seleccionada ? "✓ " : "+ "}{plat}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
             <input
               type="text"
-              placeholder="Género (Ej. RPG, Shooter)"
+              placeholder="Géneros (separados por coma. Ej: FPS, Shooter, Acción)"
               style={styles.input}
               value={formData.genero}
               onChange={(e) => setFormData({ ...formData, genero: e.target.value })}
@@ -371,7 +448,7 @@ function App() {
         {/* PANEL DE LA TABLA (LADO DERECHO) */}
         <section style={styles.sectionTable}>
           
-          {/* BARRA DE CONTADORES E INDICADORES (Opción E) */}
+          {/* BARRA DE CONTADORES E INDICADORES */}
           <div style={styles.counterBar}>
             <div style={styles.counterBadge}>
               📊 Total en Base de Datos: <strong>{productos.length}</strong>
@@ -389,28 +466,35 @@ function App() {
                 <tr>
                   <th style={styles.th}>ID</th>
                   <th style={styles.th}>Título</th>
-                  <th style={styles.th}>Plataforma</th>
-                  <th style={styles.th}>Género</th>
+                  <th style={styles.th}>Plataforma(s)</th>
+                  <th style={styles.th}>Género(s)</th>
                   <th style={styles.th}>Precio</th>
                   <th style={styles.th}>Stock</th>
                   <th style={styles.th}>Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                {productosOrdenados.map((p) => (
-                  <tr key={p.id}>
-                    <td style={styles.td}>#{p.id}</td>
-                    <td style={styles.td}><strong>{p.nombre}</strong></td>
-                    <td style={styles.td}>{p.plataforma || "N/A"}</td>
-                    <td style={styles.td}>{p.genero || p.categoria || "N/A"}</td>
-                    <td style={styles.td}>${p.precio}</td>
-                    <td style={styles.td}>{p.stock} uds.</td>
-                    <td style={styles.td}>
-                      <button style={styles.btnEdit} onClick={() => handleEditar(p)}>Editar</button>
-                      <button style={styles.btnDelete} onClick={() => handleEliminar(p.id)}>Eliminar</button>
-                    </td>
-                  </tr>
-                ))}
+                {productosOrdenados.map((p) => {
+                  const platString = p.plataforma || "N/A";
+                  const esMulti = platString.split(",").length >= 2;
+                  return (
+                    <tr key={p.id}>
+                      <td style={styles.td}>#{p.id}</td>
+                      <td style={styles.td}><strong>{p.nombre}</strong></td>
+                      <td style={styles.td}>
+                        {platString}
+                        {esMulti && <span style={styles.multiBadge}>Multi</span>}
+                      </td>
+                      <td style={styles.td}>{p.genero || p.categoria || "N/A"}</td>
+                      <td style={styles.td}>${p.precio}</td>
+                      <td style={styles.td}>{p.stock} uds.</td>
+                      <td style={styles.td}>
+                        <button style={styles.btnEdit} onClick={() => handleEditar(p)}>Editar</button>
+                        <button style={styles.btnDelete} onClick={() => handleEliminar(p.id)}>Eliminar</button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}
@@ -430,9 +514,9 @@ const styles = {
   loginSubtitle: { color: "#94a3b8", fontSize: "13px", marginBottom: "20px" },
   inputGroup: { marginBottom: "15px", textAlign: "left" },
   label: { display: "block", color: "#cbd5e1", fontSize: "13px", marginBottom: "5px" },
+  labelFormGroup: { display: "block", color: "#cbd5e1", fontSize: "12px", marginBottom: "6px" },
   input: { width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #475569", backgroundColor: "#0f172a", color: "#fff", boxSizing: "border-box" },
   select: { padding: "10px", borderRadius: "6px", border: "1px solid #475569", backgroundColor: "#0f172a", color: "#fff", flex: 1, minWidth: "140px" },
-  selectForm: { width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #475569", backgroundColor: "#0f172a", color: "#fff", boxSizing: "border-box" },
   btnPrimary: { width: "100%", padding: "10px", backgroundColor: "#38bdf8", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: "pointer", marginTop: "10px" },
   btnSuccess: { width: "100%", padding: "10px 20px", backgroundColor: "#22c55e", border: "none", borderRadius: "6px", color: "#fff", fontWeight: "bold", cursor: "pointer" },
   btnCancel: { width: "100%", padding: "10px 20px", backgroundColor: "#64748b", border: "none", borderRadius: "6px", color: "#fff", cursor: "pointer" },
@@ -444,27 +528,28 @@ const styles = {
   statusBadgeContainer: { fontSize: "12px", color: "#94a3b8" },
   statusDot: { color: "#22c55e", marginRight: "5px" },
   
-  /* Filtros Arriba */
   filterSection: { display: "flex", gap: "12px", marginBottom: "20px", backgroundColor: "#1e293b", padding: "15px", borderRadius: "10px", flexWrap: "wrap" },
   
-  /* Layout de Grid (Izquierda / Derecha) */
-  mainGrid: { display: "grid", gridTemplateColumns: "320px 1fr", gap: "20px", alignItems: "start" },
+  mainGrid: { display: "grid", gridTemplateColumns: "340px 1fr", gap: "20px", alignItems: "start" },
   
-  /* Paneles */
   sectionForm: { backgroundColor: "#1e293b", padding: "20px", borderRadius: "10px" },
   sectionTable: { backgroundColor: "#1e293b", borderRadius: "10px", overflow: "hidden" },
   crudForm: { display: "flex", flexDirection: "column", gap: "12px" },
-  
-  /* Barra de Contadores (Opción E) */
+
+  platformSelectorContainer: { display: "flex", flexWrap: "wrap", gap: "6px", maxHeight: "150px", overflowY: "auto", backgroundColor: "#0f172a", padding: "8px", borderRadius: "6px", border: "1px solid #475569" },
+  chipSelected: { backgroundColor: "#0284c7", color: "#ffffff", border: "none", padding: "4px 8px", borderRadius: "12px", fontSize: "11px", cursor: "pointer", fontWeight: "bold" },
+  chipUnselected: { backgroundColor: "#334155", color: "#94a3b8", border: "none", padding: "4px 8px", borderRadius: "12px", fontSize: "11px", cursor: "pointer" },
+
   counterBar: { display: "flex", gap: "15px", padding: "12px 16px", backgroundColor: "#0f172a", borderBottom: "1px solid #334155" },
   counterBadge: { fontSize: "13px", color: "#cbd5e1" },
 
-  /* Tabla */
   table: { width: "100%", borderCollapse: "collapse", backgroundColor: "#1e293b" },
   th: { padding: "12px", backgroundColor: "#334155", textAlign: "left", fontSize: "14px" },
   td: { padding: "12px", borderBottom: "1px solid #334155", fontSize: "14px" },
   btnEdit: { backgroundColor: "#eab308", border: "none", padding: "6px 12px", borderRadius: "4px", color: "#000", fontWeight: "bold", cursor: "pointer", marginRight: "5px" },
-  btnDelete: { backgroundColor: "#ef4444", border: "none", padding: "6px 12px", borderRadius: "4px", color: "#fff", fontWeight: "bold", cursor: "pointer" }
+  btnDelete: { backgroundColor: "#ef4444", border: "none", padding: "6px 12px", borderRadius: "4px", color: "#fff", fontWeight: "bold", cursor: "pointer" },
+  
+  multiBadge: { marginLeft: "8px", backgroundColor: "#38bdf8", color: "#0f172a", padding: "2px 6px", borderRadius: "4px", fontSize: "10px", fontWeight: "bold" }
 };
 
 export default App;
