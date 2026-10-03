@@ -11,7 +11,8 @@ function App() {
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState("Todas");
 
   useEffect(() => {
-    const API_URL = "https://mi-primer-servicio-cloud-bhn7.onrender.com";
+    // Lee la variable de Netlify o usa directamente el nuevo backend de Render
+    const API_URL = import.meta.env.VITE_API_URL || "https://videojuegos-backend-api.onrender.com";
 
     // Petición de Productos
     const fetchProductos = fetch(`${API_URL}/api/productos`).then((res) => {
@@ -50,13 +51,13 @@ function App() {
 
   // Filtrado dinámico por nombre (Reto 1) y categoría (Reto 2)
   const productosFiltrados = productos.filter((producto) => {
-    const coincideNombre = producto.nombre
+    const coincideNombre = (producto.nombre || "")
       .toLowerCase()
       .includes(busqueda.toLowerCase());
 
     const coincideCategoria =
       categoriaSeleccionada === "Todas" ||
-      producto.categoria.toLowerCase() === categoriaSeleccionada.toLowerCase();
+      (producto.categoria || "").toLowerCase() === categoriaSeleccionada.toLowerCase();
 
     return coincideNombre && coincideCategoria;
   });
@@ -65,8 +66,8 @@ function App() {
     <div style={styles.container}>
       {/* Encabezado */}
       <header style={styles.header}>
-        <div style={styles.badgeCloud}>☁️ Cloud Powered</div>
-        <h1 style={styles.title}>Mi Primer Servicio Cloud</h1>
+        <div style={styles.badgeCloud}>☁️️ Cloud Powered</div>
+        <h1 style={styles.title}>Catálogo de Videojuegos Cloud</h1>
         <p style={styles.subtitle}>
           Catálogo dinámico consumiendo datos de <strong>Google Sheets</strong> a través de una API en <strong>Node.js (Render)</strong>.
         </p>
@@ -89,10 +90,10 @@ function App() {
         <section style={styles.filterSection}>
           {/* Reto 1: Buscador por Nombre */}
           <div style={styles.inputGroup}>
-            <label style={styles.label}>🔍 Buscar producto:</label>
+            <label style={styles.label}>🔍 Buscar videojuego:</label>
             <input
               type="text"
-              placeholder="Escribe un nombre..."
+              placeholder="Escribe un título..."
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
               style={styles.input}
@@ -101,7 +102,7 @@ function App() {
 
           {/* Reto 2: Selector de Categoría */}
           <div style={styles.inputGroup}>
-            <label style={styles.label}>🏷️ Categoría:</label>
+            <label style={styles.label}>🏷️ Plataforma / Género:</label>
             <select
               value={categoriaSeleccionada}
               onChange={(e) => setCategoriaSeleccionada(e.target.value)}
@@ -126,7 +127,7 @@ function App() {
 
       {error && (
         <div style={styles.errorBox}>
-          <p>⚠️ No fue posible conectar con el servicio.</p>
+          <p>⚠️ No fue posible conectar con el servicio Cloud.</p>
         </div>
       )}
 
@@ -144,13 +145,21 @@ function App() {
                 <h3 style={styles.productName}>{producto.nombre}</h3>
 
                 <div style={styles.cardFooter}>
-                  <span style={styles.priceLabel}>Precio</span>
-                  <span style={styles.priceValue}>${producto.precio}</span>
+                  <div style={{ display: "flex", flexDirection: "column" }}>
+                    <span style={styles.priceLabel}>Precio</span>
+                    <span style={styles.priceValue}>${producto.precio}</span>
+                  </div>
+                  {producto.stock && (
+                    <div style={{ textAlign: "right" }}>
+                      <span style={styles.priceLabel}>Stock</span>
+                      <div style={styles.stockValue}>{producto.stock} uds.</div>
+                    </div>
+                  )}
                 </div>
               </div>
             ))
           ) : (
-            <p style={styles.noResults}>No se encontraron productos que coincidan con la búsqueda.</p>
+            <p style={styles.noResults}>No se encontraron videojuegos que coincidan con la búsqueda.</p>
           )}
         </main>
       )}
@@ -301,18 +310,23 @@ const styles = {
   cardFooter: {
     display: "flex",
     justifyContent: "space-between",
-    alignItems: "baseline",
+    alignItems: "center",
     borderTop: "1px solid #334155",
     paddingTop: "16px",
   },
   priceLabel: {
     color: "#94a3b8",
-    fontSize: "14px",
+    fontSize: "12px",
   },
   priceValue: {
     fontSize: "1.5rem",
     fontWeight: "800",
     color: "#34d399",
+  },
+  stockValue: {
+    fontSize: "1rem",
+    fontWeight: "700",
+    color: "#38bdf8",
   },
   noResults: {
     gridColumn: "1 / -1",
