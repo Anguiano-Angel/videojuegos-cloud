@@ -9,7 +9,7 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 
-// Reemplaza esta URL por la URL pública CSV de tu NUEVA hoja de cálculo:
+// URL pública CSV de tu hoja de cálculo
 const GOOGLE_SHEETS_CSV_URL = process.env.GOOGLE_SHEETS_CSV_URL || "https://docs.google.com/spreadsheets/d/e/2PACX-1vQOulzUrUEuRTG3Xj1v3WbF8BPO2Hc-Y9PwCTSO794qyRdMgcDLEs6y2hbYQkBo76eCGace9zjMvZm9/pub?gid=0&single=true&output=csv";
 
 app.get("/", (req, res) => {
@@ -31,17 +31,40 @@ app.get("/api/productos", async (req, res) => {
     try {
         const response = await axios.get(GOOGLE_SHEETS_CSV_URL);
 
+        // Convertir CSV a JSON normalizando las llaves (convirtiendo encabezados a minúsculas y sin espacios extras)
         const jsonArray = await csv().fromString(response.data);
 
+        console.log("Datos del CSV recibidos:", jsonArray);
+
         const productosLimpios = jsonArray.map((item, index) => {
-            const id = item.ID || item.id || item.field2 || index + 1;
-            const nombre = item.Nombre || item.nombre || item.field3 || "Sin nombre";
-            const precio = item.Precio || item.precio || item.field4 || "0";
-            const categoria = item.Categoría || item.Categoria || item.categoria || item.field5 || "General";
-            const stock = item.Stock || item.stock || item.field6 || "0";
+            // Normalizar claves del objeto para evitar problemas con tildes o espacios
+            const normalizedItem = {};
+            Object.keys(item).forEach((key) => {
+                normalizedItem[key.trim().toLowerCase()] = item[key];
+            });
+
+            const id = normalizedItem.id || index + 1;
+            const nombre =
+                normalizedItem.titulo ||
+                normalizedItem["título"] ||
+                normalizedItem.nombre ||
+                normalizedItem.videojuego ||
+                "Sin nombre";
+
+            const precio = normalizedItem.precio || "0";
+
+            const categoria =
+                normalizedItem.categoria ||
+                normalizedItem["categoría"] ||
+                normalizedItem.genero ||
+                normalizedItem["género"] ||
+                normalizedItem.plataforma ||
+                "General";
+
+            const stock = normalizedItem.stock || "0";
 
             return { id, nombre, precio, categoria, stock };
-        }).filter(p => p.nombre !== "Nombre" && p.nombre !== "Sin nombre");
+        }).filter(p => p.nombre !== "Sin nombre");
 
         res.json(productosLimpios);
     } catch (error) {
