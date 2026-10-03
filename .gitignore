@@ -6,8 +6,28 @@ frontend/node_modules/
 # Carpetas de compilación
 dist/
 frontend/dist/
+build/
 
-# Archivos de entorno y logs
+# Archivos subidos por usuarios (Imágenes subidas dinámicamente)
+uploads/
+backend/uploads/
+
+# Archivos de entorno y credenciales sensibles
 .env
-*.log
+.env.local
+.env.*.local
 gen-lang-client-0743912690-abe06168b1f9.json
+
+# Registros y logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db
+
+# Configuración local del editor (VS Code, WebStorm)
+.vscode/
+.idea/
