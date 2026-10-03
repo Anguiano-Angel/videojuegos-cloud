@@ -9,11 +9,10 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 
-// URL por defecto (puedes cambiarla por tu URL del Web App de Apps Script o tu URL CSV pública)
+// URL por defecto
 const GOOGLE_SHEETS_URL =
   process.env.GOOGLE_APPS_SCRIPT_URL ||
-  process.env.GOOGLE_SHEETS_CSV_URL ||
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vQOulzUrUEuRTG3Xj1v3WbF8BPO2Hc-Y9PwCTSO794qyRdMgcDLEs6y2hbYQkBo76eCGace9zjMvZm9/pub?gid=0&single=true&output=csv";
+  "https://script.google.com/macros/s/AKfycbzUt7niiyQJ2_csZQpJIAeUQnOC63im6n1aA_5P99g5W7F_kDlnZQA115iAeywbPRTMeA/exec";
 
 app.get("/", (req, res) => {
   res.json({ mensaje: "API Backend ejecutándose en la nube", estado: "Online" });
