@@ -49,15 +49,17 @@ function App() {
     ...new Set(productos.map((p) => p.categoria).filter(Boolean))
   ];
 
-  // Filtrado dinámico por nombre (Reto 1) y categoría (Reto 2)
+  // Filtrado seguro sin descartar elementos por fallas de tipo
   const productosFiltrados = productos.filter((producto) => {
-    const coincideNombre = (producto.nombre || "")
-      .toLowerCase()
-      .includes(busqueda.toLowerCase());
+    const nombre = String(producto.nombre || "").toLowerCase();
+    const categoria = String(producto.categoria || "").toLowerCase();
+
+    const busquedaLimpia = busqueda.toLowerCase().trim();
+    const coincideNombre = busquedaLimpia === "" || nombre.includes(busquedaLimpia);
 
     const coincideCategoria =
       categoriaSeleccionada === "Todas" ||
-      (producto.categoria || "").toLowerCase() === categoriaSeleccionada.toLowerCase();
+      categoria === categoriaSeleccionada.toLowerCase().trim();
 
     return coincideNombre && coincideCategoria;
   });
