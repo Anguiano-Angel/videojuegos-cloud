@@ -368,7 +368,7 @@ app.delete("/api/productos/:id", async (req, res) => {
 const { GoogleGenAI } = require("@google/genai");
 
 // =====================================================
-// ENDPOINT DEL ASISTENTE CLOUD CON IA (SDK OFICIAL)
+// ENDPOINT DEL ASISTENTE CLOUD CON IA (SDK ROBUSTO)
 // =====================================================
 
 app.post("/api/chat", async (req, res) => {
@@ -396,27 +396,30 @@ app.post("/api/chat", async (req, res) => {
         )
         .join("\n");
     } catch (err) {
-      console.error(
-        "No se pudo cargar el contexto de Google Sheets:",
-        err.message
-      );
+      console.error("Error al cargar Google Sheets:", err.message);
       catalogoContexto = "No hay datos de catálogo disponibles en este momento.";
     }
 
-    // 2. Inicializar el cliente oficial con la API Key de Render
+    // 2. Verificar API Key de Gemini
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return res
-        .status(500)
-        .json({ error: "Falta configurar la GEMINI_API_KEY en las variables de entorno de Render." });
+      return res.status(500).json({
+        error: "Falta configurar la variable GEMINI_API_KEY en Render."
+      });
     }
 
-    const ai = new GoogleGenAI({ apiKey: apiKey });
+    // 3. Inicializar GoogleGenAI con la clave
+    const ai = new GoogleGenAI({ apiKey });
 
-    // 3. Generar contenido utilizando el modelo recomendado
+    // 4. Llamada al modelo 'gemini-2.5-flash'
     const responseAi = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: `Eres el Asistente Cloud con IA para una tienda de videojuegos en la nube. 
+      model: "gemini-2.5-flash",
+      contents: [
+        {
+          role: "user",
+          parts: [
+            {
+              text: `Eres el Asistente Cloud con IA para una tienda de videojuegos en la nube. 
 Utiliza la siguiente información de la base de datos (Google Sheets) para responder de forma amable, precisa y útil a las dudas del usuario. Si te preguntan por un juego, revisa el stock, precio y plataformas.
 
 CATÁLOGO EN GOOGLE SHEETS:
@@ -424,20 +427,27 @@ ${catalogoContexto}
 
 PREGUNTA DEL USUARIO:
 ${prompt}`
+            }
+          ]
+        }
+      ]
     });
 
-    const aiReply = responseAi.text();
+    // 5. Obtener texto de respuesta de la IA
+    const aiReply = responseAi.text || "No se pudo generar una respuesta.";
 
-    res.json({
+    return res.json({
       status: "success",
       reply: aiReply
     });
 
   } catch (error) {
-    console.error("Error detallado con GoogleGenAI SDK:", error);
-    res.status(500).json({
+    console.error("Error completo en /api/chat:", error);
+
+    // Devolvemos el mensaje detallado para diagnosticar directamente en pantalla
+    return res.status(500).json({
       error: "Error al procesar la consulta con el servicio de Inteligencia Artificial",
-      detalles: error.message
+      detalles: error.message || String(error)
     });
   }
 });
