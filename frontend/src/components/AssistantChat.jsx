@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import './AssistantChat.css'; // Opcional si prefieres estilos en archivo separado
+import './AssistantChat.css';
 
 const AssistantChat = () => {
   const [messages, setMessages] = useState([
@@ -9,7 +9,9 @@ const AssistantChat = () => {
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
 
-  // Auto-scroll al final del chat cada vez que haya nuevos mensajes
+  // Obtener la URL del backend igual que en App.jsx
+  const API_URL = import.meta.env.VITE_API_URL || "https://videojuegos-backend-api.onrender.com";
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -28,8 +30,8 @@ const AssistantChat = () => {
     setLoading(true);
 
     try {
-      // Petición a tu API REST en el backend
-      const response = await fetch('/api/chat', {
+      // AQUÍ ESTABA EL ERROR: Apuntamos directamente al backend externo (Render)
+      const response = await fetch(`${API_URL}/api/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -42,7 +44,7 @@ const AssistantChat = () => {
       if (response.ok) {
         setMessages((prev) => [...prev, { sender: 'assistant', text: data.reply }]);
       } else {
-        setMessages((prev) => [...prev, { sender: 'assistant', text: 'Lo siento, ocurrió un error al procesar tu consulta con el servidor.' }]);
+        setMessages((prev) => [...prev, { sender: 'assistant', text: `Error del servidor: ${data.error || 'Desconocido'}` }]);
       }
     } catch (error) {
       console.error('Error de red:', error);
