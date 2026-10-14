@@ -368,7 +368,7 @@ app.delete("/api/productos/:id", async (req, res) => {
 const { GoogleGenAI } = require("@google/genai");
 
 // =====================================================
-// ENDPOINT DEL ASISTENTE CLOUD CON IA (SDK ROBUSTO)
+// ENDPOINT DEL ASISTENTE CLOUD CON IA (AISLADO Y ESTABLE)
 // =====================================================
 
 app.post("/api/chat", async (req, res) => {
@@ -408,32 +408,25 @@ app.post("/api/chat", async (req, res) => {
       });
     }
 
-    // 3. Inicializar GoogleGenAI con la clave
+    // 3. Crear una nueva instancia limpia de GoogleGenAI por cada petición
     const ai = new GoogleGenAI({ apiKey });
 
-    // 4. Llamada al modelo 'gemini-3.8-flash'
-    const responseAi = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
-      contents: [
-        {
-          role: "user",
-          parts: [
-            {
-              text: `Eres el Asistente Cloud con IA para una tienda de videojuegos en la nube. 
+    // 4. Estructurar el texto completo del prompt de forma plana para evitar conflictos de historial
+    const promptCompleto = `Eres el Asistente Cloud con IA para una tienda de videojuegos en la nube. 
 Utiliza la siguiente información de la base de datos (Google Sheets) para responder de forma amable, precisa y útil a las dudas del usuario. Si te preguntan por un juego, revisa el stock, precio y plataformas.
 
 CATÁLOGO EN GOOGLE SHEETS:
 ${catalogoContexto}
 
 PREGUNTA DEL USUARIO:
-${prompt}`
-            }
-          ]
-        }
-      ]
+${prompt}`;
+
+    // 5. Llamada limpia al modelo
+    const responseAi = await ai.models.generateContent({
+      model: "gemini-3.8-flash",
+      contents: promptCompleto
     });
 
-    // 5. Obtener texto de respuesta de la IA
     const aiReply = responseAi.text || "No se pudo generar una respuesta.";
 
     return res.json({
@@ -442,9 +435,8 @@ ${prompt}`
     });
 
   } catch (error) {
-    console.error("Error completo en /api/chat:", error);
+    console.error("Error en /api/chat:", error);
 
-    // Devolvemos el mensaje detallado para diagnosticar directamente en pantalla
     return res.status(500).json({
       error: "Error al procesar la consulta con el servicio de Inteligencia Artificial",
       detalles: error.message || String(error)
