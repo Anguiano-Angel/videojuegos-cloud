@@ -411,9 +411,9 @@ app.post("/api/chat", async (req, res) => {
     // 3. Inicializar GoogleGenAI con la clave
     const ai = new GoogleGenAI({ apiKey });
 
-    // 4. Llamada al modelo 'gemini-2.5-flash'
+    // 4. Llamada al modelo 'gemini-3.8-flash'
     const responseAi = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.8-flash",
       contents: [
         {
           role: "user",
