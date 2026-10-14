@@ -363,6 +363,87 @@ app.delete("/api/productos/:id", async (req, res) => {
 });
 
 // =====================================================
+// ENDPOINT DEL ASISTENTE CLOUD CON IA
+// =====================================================
+
+app.post("/api/chat", async (req, res) => {
+  try {
+    const { prompt } = req.body;
+
+    if (!prompt) {
+      return res.status(400).json({ error: "El prompt es obligatorio" });
+    }
+
+    // 1. Obtener la información actual de Google Sheets para usarla como contexto
+    let catalogoContexto = "";
+    try {
+      const response = await axios.get(GOOGLE_SHEETS_URL);
+      let jsonArray = Array.isArray(response.data) ? response.data : await csv().fromString(response.data);
+      
+      catalogoContexto = jsonArray.map(j => 
+        `- Título: ${j.titulo || j.nombre}, Plataforma: ${j.plataforma}, Género: ${j.genero || j.categoria}, Precio: $${j.precio}, Stock: ${j.stock}`
+      ).join("\n");
+    } catch (err) {
+      console.error("No se pudo cargar el contexto de Google Sheets para la IA:", err.message);
+      catalogoContexto = "No hay datos de catálogo disponibles en este momento.";
+    }
+
+    // 2. Configurar la llamada a la API de Inteligencia Artificial (Gemini)
+    // Nota: Asegúrate de tener configurada tu variable de entorno GEMINI_API_KEY en tu servidor o Vercel.
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: "Falta configurar la GEMINI_API_KEY en las variables de entorno del servidor." });
+    }
+
+    const aiResponse = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                text: `Eres el Asistente Cloud con IA para una tienda de videojuegos en la nube. 
+Utiliza la siguiente información de la base de datos (Google Sheets) para responder a las dudas del usuario de forma amable, precisa y útil. Si te preguntan por un juego, revisa el stock, precio y plataformas.
+
+INFORMACIÓN DEL GOOGLE SHEETS:
+${catalogoContexto}
+
+PREGUNTA DEL USUARIO:
+${prompt}`
+              }
+            ]
+          }
+        ]
+      },
+      {
+        headers: { "Content-Type": "application/json" }
+      }
+    );
+
+    // 3. Extraer la respuesta generada por el modelo
+    const candidates = aiResponse.data?.candidates;
+    if (!candidates || candidates.length === 0) {
+      throw new Error("La IA no devolvió ninguna respuesta.");
+    }
+
+    const aiReply = candidates[0].content.parts[0].text;
+
+    res.json({
+      status: "success",
+      reply: aiReply
+    });
+
+  } catch (error) {
+    console.error("Error en el Asistente de IA:", error.response?.data || error.message);
+    res.status(500).json({
+      error: "Error al procesar la consulta con el servicio de Inteligencia Artificial",
+      detalles: error.response?.data?.error?.message || error.message
+    });
+  }
+});
+
+// =====================================================
 // INICIAR SERVIDOR
 // =====================================================
 

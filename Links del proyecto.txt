@@ -1,0 +1,11 @@
+Hoja de Google Sheets
+https://docs.google.com/spreadsheets/d/1lZz04ck6eyYn5tyLkIPSYbNyx4GKSMZ610AmZXpvFUc/edit?usp=sharing
+
+Repositorio GitHub
+https://github.com/Anguiano-Angel/videojuegos-cloud
+
+Link del proyecto en Vercel
+videojuegos-cloud.vercel.app
+
+Usuario: admin
+Password: 12345

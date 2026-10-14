@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import "./App.css";
+import AssistantChat from "./components/AssistantChat";
 
 // Opciones predefinidas de Plataformas
 const LISTA_PLATAFORMAS = [
@@ -824,6 +825,17 @@ function App() {
           >
             ⚙️ Administración / Lista
           </button>
+
+          <button
+            style={
+              vistaActual === "asistente"
+                ? styles.navButtonActive
+                : styles.navButton
+            }
+            onClick={() => setVistaActual("asistente")}
+          >
+            🤖 Asistente IA
+          </button>
         </nav>
       </header>
 
@@ -1593,6 +1605,13 @@ function App() {
                 </table>
               </section>
             </div>
+          )}
+
+          {/* =====================================================
+              ASISTENTE CLOUD CON IA
+          ===================================================== */}
+          {vistaActual === "asistente" && (
+            <AssistantChat />
           )}
         </>
       )}

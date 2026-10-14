@@ -1,0 +1,115 @@
+.assistant-chat-container {
+  max-width: 700px;
+  margin: 2rem auto;
+  background: #1e1e2f;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  height: 550px;
+  color: #fff;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  overflow: hidden;
+  border: 1px solid #2a2a40;
+}
+
+.chat-header {
+  background: #252538;
+  padding: 1rem;
+  text-align: center;
+  border-bottom: 1px solid #33334d;
+}
+
+.chat-header h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: #00ffcc;
+}
+
+.chat-subtitle {
+  font-size: 0.8rem;
+  color: #a0a0c0;
+}
+
+.chat-messages {
+  flex: 1;
+  padding: 1rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #151522;
+}
+
+.message-bubble {
+  max-width: 75%;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  word-wrap: break-word;
+}
+
+.message-bubble.user {
+  background: #007acc;
+  color: white;
+  align-self: flex-end;
+  border-bottom-right-radius: 2px;
+}
+
+.message-bubble.assistant {
+  background: #2d2d44;
+  color: #e0e0e0;
+  align-self: flex-start;
+  border-bottom-left-radius: 2px;
+  border: 1px solid #3d3d5c;
+}
+
+.message-bubble.loading {
+  font-style: italic;
+  color: #8888b0;
+}
+
+.chat-input-form {
+  display: flex;
+  padding: 1rem;
+  background: #252538;
+  border-top: 1px solid #33334d;
+}
+
+.chat-input-form input {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 6px;
+  border: 1px solid #444466;
+  background: #1a1a29;
+  color: white;
+  font-size: 0.95rem;
+  outline: none;
+}
+
+.chat-input-form input:focus {
+  border-color: #00ffcc;
+}
+
+.chat-input-form button {
+  margin-left: 10px;
+  padding: 10px 20px;
+  background: #00ffcc;
+  color: #111;
+  border: none;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.chat-input-form button:hover:not(:disabled) {
+  background: #00ccb3;
+}
+
+.chat-input-form button:disabled {
+  background: #444455;
+  color: #888;
+  cursor: not-allowed;
+}
