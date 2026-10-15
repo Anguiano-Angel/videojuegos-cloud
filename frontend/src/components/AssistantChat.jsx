@@ -64,7 +64,19 @@ const AssistantChat = () => {
       <div className="chat-messages">
         {messages.map((msg, index) => (
           <div key={index} className={`message-bubble ${msg.sender}`}>
-            <div className="message-text">{msg.text}</div>
+            <div className="message-text">
+              {msg.text.split('\n').map((linea, idx) => {
+                // Reemplazo básico y limpio para convertir **texto** en negritas visuales
+                const partes = linea.split('**');
+                return (
+                  <p key={idx} style={{ margin: '4px 0' }}>
+                    {partes.map((parte, i) => (
+                      i % 2 === 1 ? <strong key={i}>{parte}</strong> : parte
+                    ))}
+                  </p>
+                );
+              })}
+            </div>
           </div>
         ))}
         {loading && (
