@@ -368,7 +368,7 @@ app.delete("/api/productos/:id", async (req, res) => {
 const { GoogleGenAI } = require("@google/genai");
 
 // =====================================================
-// ENDPOINT DEL ASISTENTE CLOUD CON IA (ALTA DISPONIBILIDAD: GEMINI + OPENROUTER)
+// ENDPOINT DEL ASISTENTE CLOUD CON IA (RESPALDO OPENROUTER GARANTIZADO)
 // =====================================================
 
 app.post("/api/chat", async (req, res) => {
@@ -400,7 +400,7 @@ app.post("/api/chat", async (req, res) => {
       catalogoContexto = "No hay datos de catálogo disponibles en este momento.";
     }
 
-    // 2. Construir el prompt unificado
+    // 2. Construir el prompt unificado de Cortana
     const promptCompleto = `Eres Cortana, el Asistente Digital e Inteligencia Artificial para una tienda de videojuegos en la nube. 
 Utiliza la siguiente información de la base de datos (Google Sheets) para responder de forma amable, precisa y útil a las dudas del usuario. Si te preguntan por un juego, revisa el stock, precio y plataformas.
 REGLAS DE FORMATO:
@@ -415,45 +415,25 @@ PREGUNTA DEL USUARIO:
 ${prompt}`;
 
     let aiReply = "";
+    const apiKeyOpenRouter = process.env.OPENROUTER_API_KEY;
 
     // =====================================================
-    // INTENTO 1: Red de modelos Gemini (Google AI Studio)
+    // INTENTO PRINCIPAL: OpenRouter con modelo gratuito activo
     // =====================================================
-    const apiKeyGemini = process.env.GEMINI_API_KEY;
-    if (apiKeyGemini) {
-      const ai = new GoogleGenAI({ apiKey: apiKeyGemini });
-      const modelosGemini = ["gemini-3.8-flash"];
+    if (apiKeyOpenRouter) {
+      const modelosLibresOpenRouter = [
+        "google/gemini-2.0-flash-lite-001:free",
+        "meta-llama/llama-3-8b-instruct:free",
+        "deepseek/deepseek-chat:free"
+      ];
 
-      for (const modelo of modelosGemini) {
+      for (const modeloLibre of modelosLibresOpenRouter) {
         try {
-          console.log(`Intentando con el modelo Gemini: ${modelo}...`);
-          const responseAi = await ai.models.generateContent({
-            model: modelo,
-            contents: promptCompleto
-          });
-          if (responseAi && responseAi.text) {
-            aiReply = responseAi.text;
-            console.log(`¡Éxito con Gemini (${modelo})!`);
-            break;
-          }
-        } catch (err) {
-          console.warn(`Gemini (${modelo}) falló:`, err.message);
-        }
-      }
-    }
-
-    // =====================================================
-    // INTENTO 2: Respaldo Multi-Cloud en OpenRouter
-    // =====================================================
-    if (!aiReply) {
-      const apiKeyOpenRouter = process.env.OPENROUTER_API_KEY;
-      if (apiKeyOpenRouter) {
-        try {
-          console.log("Activando respaldo automático en OpenRouter...");
+          console.log(`Intentando con OpenRouter (${modeloLibre})...`);
           const openRouterResponse = await axios.post(
             "https://openrouter.ai/api/v1/chat/completions",
             {
-              model: "deepseek/deepseek-r1:free", // Usamos DeepSeek R1 Free que está disponible de forma global
+              model: modeloLibre,
               messages: [{ role: "user", content: promptCompleto }]
             },
             {
@@ -468,20 +448,42 @@ ${prompt}`;
 
           aiReply = openRouterResponse.data?.choices?.[0]?.message?.content;
           if (aiReply) {
-            console.log("¡Éxito obtenido mediante el respaldo de OpenRouter!");
+            console.log(`¡Éxito obtenido mediante OpenRouter usando ${modeloLibre}!`);
+            break;
           }
         } catch (routerErr) {
           console.error(
-            "Error en OpenRouter:",
+            `Error en OpenRouter (${modeloLibre}):`,
             JSON.stringify(routerErr.response?.data || routerErr.message)
           );
         }
       }
     }
 
-    // Si ambos proveedores fallan
+    // =====================================================
+    // RESPALDO SECUNDARIO: Si OpenRouter fallara, intentamos Gemini por si acaso
+    // =====================================================
     if (!aiReply) {
-      aiReply = "Lo siento, Jefe. Mis sistemas en la nube se encuentran experimentando saturación temporal en este instante. Por favor, intenta de nuevo en unos segundos.";
+      const apiKeyGemini = process.env.GEMINI_API_KEY;
+      if (apiKeyGemini) {
+        try {
+          const ai = new GoogleGenAI({ apiKey: apiKeyGemini });
+          const responseAi = await ai.models.generateContent({
+            model: "gemini-3.8-flash",
+            contents: promptCompleto
+          });
+          if (responseAi && responseAi.text) {
+            aiReply = responseAi.text;
+          }
+        } catch (geminiErr) {
+          console.warn("Gemini sigue con límite excedido:", geminiErr.message);
+        }
+      }
+    }
+
+    // Si todo falla
+    if (!aiReply) {
+      aiReply = "Lo siento, Jefe. Mis sistemas en la nube alcanzaron su límite temporal. Por favor, intenta de nuevo más tarde.";
     }
 
     return res.json({
