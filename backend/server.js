@@ -443,24 +443,24 @@ ${prompt}`;
     }
 
     // =====================================================
-    // INTENTO 2: Respaldo Multi-Cloud con OpenRouter (si Gemini falló)
+    // INTENTO 2: Respaldo Multi-Cloud en OpenRouter
     // =====================================================
     if (!aiReply) {
       const apiKeyOpenRouter = process.env.OPENROUTER_API_KEY;
       if (apiKeyOpenRouter) {
         try {
-          console.log("Gemini no disponible. Activando respaldo automático en OpenRouter...");
+          console.log("Activando respaldo automático en OpenRouter...");
           const openRouterResponse = await axios.post(
             "https://openrouter.ai/api/v1/chat/completions",
             {
-              model: "google/gemini-2.0-flash-lite-001:free", // Modelo gratuito activo y ultra estable
-              messages: [
-                { role: "user", content: promptCompleto }
-              ]
+              model: "deepseek/deepseek-r1:free", // Usamos DeepSeek R1 Free que está disponible de forma global
+              messages: [{ role: "user", content: promptCompleto }]
             },
             {
               headers: {
-                "Authorization": `Bearer ${apiKeyOpenRouter}`,
+                "Authorization": `Bearer ${apiKeyOpenRouter.trim()}`,
+                "HTTP-Referer": "https://videojuegos-cloud.vercel.app",
+                "X-Title": "Asistente Cloud IA",
                 "Content-Type": "application/json"
               }
             }
@@ -471,7 +471,10 @@ ${prompt}`;
             console.log("¡Éxito obtenido mediante el respaldo de OpenRouter!");
           }
         } catch (routerErr) {
-          console.error("Error también en el respaldo de OpenRouter:", routerErr.response?.data || routerErr.message);
+          console.error(
+            "Error en OpenRouter:",
+            JSON.stringify(routerErr.response?.data || routerErr.message)
+          );
         }
       }
     }
