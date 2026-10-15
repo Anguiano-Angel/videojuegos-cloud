@@ -834,7 +834,7 @@ function App() {
             }
             onClick={() => setVistaActual("asistente")}
           >
-            🤖 Asistente IA
+            💠 Cortana 💠
           </button>
         </nav>
       </header>

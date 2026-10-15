@@ -3,7 +3,7 @@ import './AssistantChat.css';
 
 const AssistantChat = () => {
   const [messages, setMessages] = useState([
-    { sender: 'assistant', text: '¡Hola, Angel! Soy tu Asistente Cloud con IA. ¿Qué videojuego estás buscando o de qué título de nuestro catálogo te gustaría consultar información?' }
+    { sender: 'assistant', text: '¡Hola, Jefe! Aquí cortana. ¿Qué videojuego estás buscando o de qué título de nuestro catálogo te gustaría consultar información?' }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -57,8 +57,8 @@ const AssistantChat = () => {
   return (
     <div className="assistant-chat-container">
       <div className="chat-header">
-        <h3>🤖 Asistente Cloud con IA</h3>
-        <span className="chat-subtitle">Catálogo de Videojuegos (Google Sheets)</span>
+        <h3>💠 Asistente Digital IA 💠</h3>
+        <span className="chat-subtitle">Cortana te da la bienvenida</span>
       </div>
 
       <div className="chat-messages">
