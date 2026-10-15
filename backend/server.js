@@ -368,7 +368,7 @@ app.delete("/api/productos/:id", async (req, res) => {
 const { GoogleGenAI } = require("@google/genai");
 
 // =====================================================
-// ENDPOINT DEL ASISTENTE CLOUD CON IA (RESPALDO OPENROUTER GARANTIZADO)
+// ENDPOINT DEL ASISTENTE CLOUD CON IA (OPENROUTER/FREE + GEMINI)
 // =====================================================
 
 app.post("/api/chat", async (req, res) => {
@@ -415,58 +415,50 @@ PREGUNTA DEL USUARIO:
 ${prompt}`;
 
     let aiReply = "";
+
+    // =====================================================
+    // INTENTO 1: Usar el enrutador automático gratuito de OpenRouter (`openrouter/free`)
+    // =====================================================
     const apiKeyOpenRouter = process.env.OPENROUTER_API_KEY;
-
-    // =====================================================
-    // INTENTO PRINCIPAL: OpenRouter con modelo gratuito activo
-    // =====================================================
     if (apiKeyOpenRouter) {
-      const modelosLibresOpenRouter = [
-        "google/gemini-2.0-flash-lite-001:free",
-        "meta-llama/llama-3-8b-instruct:free",
-        "deepseek/deepseek-chat:free"
-      ];
-
-      for (const modeloLibre of modelosLibresOpenRouter) {
-        try {
-          console.log(`Intentando con OpenRouter (${modeloLibre})...`);
-          const openRouterResponse = await axios.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            {
-              model: modeloLibre,
-              messages: [{ role: "user", content: promptCompleto }]
-            },
-            {
-              headers: {
-                "Authorization": `Bearer ${apiKeyOpenRouter.trim()}`,
-                "HTTP-Referer": "https://videojuegos-cloud.vercel.app",
-                "X-Title": "Asistente Cloud IA",
-                "Content-Type": "application/json"
-              }
+      try {
+        console.log("Enviando petición a OpenRouter mediante el enrutador automático (openrouter/free)...");
+        const openRouterResponse = await axios.post(
+          "https://openrouter.ai/api/v1/chat/completions",
+          {
+            model: "openrouter/free", // Selecciona automáticamente un modelo gratuito disponible
+            messages: [{ role: "user", content: promptCompleto }]
+          },
+          {
+            headers: {
+              "Authorization": `Bearer ${apiKeyOpenRouter.trim()}`,
+              "HTTP-Referer": "https://videojuegos-cloud.vercel.app",
+              "X-Title": "Asistente Cloud IA",
+              "Content-Type": "application/json"
             }
-          );
-
-          aiReply = openRouterResponse.data?.choices?.[0]?.message?.content;
-          if (aiReply) {
-            console.log(`¡Éxito obtenido mediante OpenRouter usando ${modeloLibre}!`);
-            break;
           }
-        } catch (routerErr) {
-          console.error(
-            `Error en OpenRouter (${modeloLibre}):`,
-            JSON.stringify(routerErr.response?.data || routerErr.message)
-          );
+        );
+
+        aiReply = openRouterResponse.data?.choices?.[0]?.message?.content;
+        if (aiReply) {
+          console.log("¡Éxito obtenido mediante OpenRouter Free Router!");
         }
+      } catch (routerErr) {
+        console.error(
+          "Error en OpenRouter Free Router:",
+          JSON.stringify(routerErr.response?.data || routerErr.message)
+        );
       }
     }
 
     // =====================================================
-    // RESPALDO SECUNDARIO: Si OpenRouter fallara, intentamos Gemini por si acaso
+    // INTENTO 2: Respaldo en Gemini (si OpenRouter tuviera algún detalle temporal)
     // =====================================================
     if (!aiReply) {
       const apiKeyGemini = process.env.GEMINI_API_KEY;
       if (apiKeyGemini) {
         try {
+          console.log("Intentando respaldo con Gemini 3.8 Flash...");
           const ai = new GoogleGenAI({ apiKey: apiKeyGemini });
           const responseAi = await ai.models.generateContent({
             model: "gemini-3.8-flash",
@@ -474,16 +466,17 @@ ${prompt}`;
           });
           if (responseAi && responseAi.text) {
             aiReply = responseAi.text;
+            console.log("¡Éxito con Gemini 3.8 Flash!");
           }
         } catch (geminiErr) {
-          console.warn("Gemini sigue con límite excedido:", geminiErr.message);
+          console.warn("Gemini también falló por cuota:", geminiErr.message);
         }
       }
     }
 
-    // Si todo falla
+    // Si ambos proveedores fallan
     if (!aiReply) {
-      aiReply = "Lo siento, Jefe. Mis sistemas en la nube alcanzaron su límite temporal. Por favor, intenta de nuevo más tarde.";
+      aiReply = "Lo siento, Angel. Se han alcanzado los límites de peticiones gratuitas temporales en la nube. Por favor, intenta más tarde.";
     }
 
     return res.json({
